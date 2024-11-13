@@ -15,5 +15,3 @@ Article:
 
 `*` These authors contributed equally
 
-/*
-\*
