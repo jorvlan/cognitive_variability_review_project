@@ -8,10 +8,11 @@ Article:
 
 <br>
 <pre>
-- van Langen, J., Aristodemou, M., & Kievit, R. A.
+- van Langen, J.*, Aristodemou, M.*, & Kievit, R. A.
     Cognitive variability on stable ground: Mapping the state of fluctuations in development
     <b>in preparation</b>
 </pre>
 
+* These authors contributed equally
 
 
