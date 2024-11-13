@@ -1,4 +1,17 @@
 # cognitive_variability_review_project
 
-All corresponding .R code files for cognitive variability parameter calculation and manuscript figure creation will be stored in here
+Software repository containing .R code for:
+- variability operand calculation
+- manuscript figure creation
+
+Article:
+
+<br>
+<pre>
+- van Langen, J., Aristodemou, M., & Kievit, R. A.
+    Cognitive variability on stable ground: Mapping the state of fluctuations in development
+    <b>in preparation</b>
+</pre>
+
+
 
