@@ -15,3 +15,9 @@ Article:
 
 `*` These authors contributed equally
 
+
+
+to do:
+
+
+# Refer to: inspired this tutorial and is a great alternative https://quantdev.ssri.psu.edu/tutorials/analysis-experience-sampling-ema-data-chapter-21-univariate-intraindividual-variability + look up which other measures are there and wortwhile implementing here?
