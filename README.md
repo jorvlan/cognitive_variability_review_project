@@ -9,17 +9,11 @@ Article:
 <br>
 <pre>
 - van Langen, J.*, Aristodemou, M.*, & Kievit, R. A.
-    Cognitive variability on stable ground: Mapping the state of fluctuations in development
-    <b>in preparation</b>
+    Cognitive variability on stable ground: A narrative review of cognitive variability in childhood and adolescence
+    <b>to be submitted to Developmental Review</b>
 </pre>
 
 `*` These authors contributed equally
 
-
-
-to do:
-
-
-# in tutorial: Refer to: inspired this tutorial and is a great alternative https://quantdev.ssri.psu.edu/tutorials/analysis-experience-sampling-ema-data-chapter-21-univariate-intraindividual-variability + look up which other measures are there and wortwhile implementing here?
 
 
