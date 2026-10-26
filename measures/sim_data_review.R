@@ -66,13 +66,28 @@ DataGen <- function(nsubj, nwave, nobs,
   wave.loc <- rep(rep(wave_loc, each = nobs), nsubj)
   wave.scale <- rep(rep(wave_scale, each = nobs), nsubj)
   
-  # Specify model
-  y = rep(0,N)
-  y[1] = beta1 
-  for(i in 2:N){
-    y[i] = rnorm(1, mean = beta1 + subj1.tau[i] + (time[i] - mtime)*(beta2 + subj2.tau[i]) + (y[i-1] - (wave.loc[i] + beta1 + subj1.tau[i]))*(beta3 + subj3.tau[i]) + wave.loc[i], 
-                 exp(alpha0 + subj4.tau[i] + (time[i] - mtime)*(alpha1 + subj5.tau[i]) + wave.scale[i]))
+  # Specify model (restart AR for each subject)
+  first <- c(TRUE, subject[-1] != subject[-N])
+  y <- numeric(N)
+  for (i in 1:N) {
+    mu_i  <- beta1 + subj1.tau[i] + wave.loc[i]
+    trend <- (time[i] - mtime) * (beta2 + subj2.tau[i])
+    phi_i <- beta3 + subj3.tau[i]
+    sd_i  <- exp(alpha0 + subj4.tau[i] + (time[i] - mtime) * (alpha1 + subj5.tau[i]) + wave.scale[i])
+    if (first[i]) {
+      # stationary start for each subject
+      y[i] <- rnorm(1, mu_i + trend, sd_i / sqrt(1 - phi_i^2))
+    } else {
+      y[i] <- rnorm(1, mu_i + trend + (y[i - 1] - mu_i) * phi_i, sd_i)
+    }
   }
+  
+# y = rep(0,N)
+#  y[1] = beta1 
+#  for(i in 2:N){
+#    y[i] = rnorm(1, mean = beta1 + subj1.tau[i] + (time[i] - mtime)*(beta2 + subj2.tau[i]) + (y[i-1] - (wave.loc[i] + beta1 + subj1.tau[i]))*(beta3 + subj3.tau[i]) + wave.loc[i], 
+#                 exp(alpha0 + subj4.tau[i] + (time[i] - mtime)*(alpha1 + subj5.tau[i]) + wave.scale[i]))
+#  }
   
   # Create data frame
   df.LSME <- data.frame(subject = subject, wave = wave, time = time,
@@ -113,6 +128,9 @@ DataGen <- function(nsubj, nwave, nobs,
   
   
   df.LSME = output$df.LSME
+  sd_meas <- 0.5
+  df.LSME$y_true <- df.LSME$y
+  df.LSME$y <- df.LSME$y + rnorm(n = nrow(df.LSME), mean = 0, sd = sd_meas)
   gtruth = output$gtruth
   # add name labels to gtruth values
     name_vars <- c(
@@ -124,6 +142,9 @@ DataGen <- function(nsubj, nwave, nobs,
       paste0("tau_u[", 1:4, "]")
     )
     gtruth[c(2,22)] <- gtruth[c(2,22)] * length(unique(df.LSME$time)) 
+    
+    gtruth    <- c(gtruth, log(sd_meas))
+    name_vars <- c(name_vars, "log_sd_meas")
   
   # create dataframe for gtruth
   gtruth = tibble(
@@ -148,19 +169,16 @@ DataGen <- function(nsubj, nwave, nobs,
     # mutate(Y_tm1 = Y_tm1 - mean(Y_tm1)) %>%
     ungroup()
   
-  #3-level model
-  df.LSME = df.LSME %>% 
-    group_by(subject, wave) %>% 
-    mutate(Y_tm1d = lag(y)) %>%
-    mutate(Y_tm1d = if_else(is.na(Y_tm1d), mean(Y_tm1d, na.rm=TRUE), Y_tm1d)) %>%
-    #mutate(Y_tm1d = Y_tm1d - mean(na.omit(Y_tm1d))) %>%
-    ungroup()
-  
   # Create within-person centered time
   df.LSME = df.LSME %>%
     group_by(subject) %>%
-    mutate(ctime = time/100) %>%
+    mutate(ctime = time / length(unique(df.LSME$time))) %>%
     mutate(mtime = mean(ctime)) %>%
+    ungroup()
+  
+  df.LSME = df.LSME %>%
+    group_by(subject) %>%
+    mutate(first = as.integer(row_number() == 1)) %>%
     ungroup()
   
   l2time = df.LSME$mtime[which(df.LSME$time == "1")]  
