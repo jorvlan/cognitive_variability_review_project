@@ -86,7 +86,7 @@ DataGen <- function(nsubj, nwave, nobs,
     b_i   <- beta2 + subj2.tau[i]
     phi_i <- beta3 + subj3.tau[i]
     sd_i  <- exp(alpha0 + subj4.tau[i] + (time[i] - mtime) * (alpha1 + subj5.tau[i]) + wave.scale[i])
-
+    
     mu_now <- mu_i + (time[i] - mtime) * b_i
     
     if (first[i]) {
@@ -99,16 +99,16 @@ DataGen <- function(nsubj, nwave, nobs,
     }
   }
   
-
-# Create data frame
-df.LSME <- data.frame(subject = subject, wave = wave, time = time,
+  
+  # Create data frame
+  df.LSME <- data.frame(subject = subject, wave = wave, time = time,
                         y = y)
   
-# Save true values in a vector
-
-gtruth <- c(beta1, beta2, beta3, 
-                cor.subj_tau[1:4,1:4],  alpha0,
-                sd.subj_tau[1:4])
+  # Save true values in a vector
+  
+  gtruth <- c(beta1, beta2, beta3, 
+              cor.subj_tau[1:4,1:4],  alpha0,
+              sd.subj_tau[1:4])
   
   return(list(df.LSME = df.LSME, gtruth = gtruth, subj_tau = subj_tau))
 }
@@ -119,47 +119,47 @@ gtruth <- c(beta1, beta2, beta3,
 
 set.seed(2094)
 
-  # Run function
+# Run function
 output <- DataGen(nsubj = npeople, nwave = ndays, nobs = tpoints, # subjects, waves, trials
-                    # Fixed effects
-                    beta1 = 0.5, # group mean
-                    beta2 = 0.005,# group trend   (rescaled for tpoints = 100)
-                    beta3 = 0.5, # group ar-1
-                    alpha0 = -0.2, # group sigma (residual SD (innovations))
-                    alpha1 = 0, # group trend on residuals
-                    # Random effects
-                    sd.subj_tau = c(0.26, 0.004, 0.11, 0.141, 0.0001), # [2] rescaled for tpoints = 100
-                    sd.wave_loc = 0, # day-to-day sd in means
-                    sd.wave_scale = 0, # day-to-daysd in sigma (trialvar)
-                    cor.subj_tau = matrix(c(1.000, 0.662, 0.445, 0.609, 0.000,
-                                            0.662, 1.000, 0.396, 0.563, 0.000,
-                                            0.445, 0.396, 1.000, 0.305, 0.000,
-                                            0.609, 0.563, 0.305, 1.000, 0.000,
-                                            0.000, 0.000, 0.000, 0.000, 1.000),
-                                          nrow = 5,
-                                          byrow = TRUE)) # correlation matrix for scale trial-level estimates
-  
-  
+                  # Fixed effects
+                  beta1 = 0.5, # group mean
+                  beta2 = 0.005,# group trend   (rescaled for tpoints = 100)
+                  beta3 = 0.5, # group ar-1
+                  alpha0 = -0.2, # group sigma (residual SD (innovations))
+                  alpha1 = 0, # group trend on residuals
+                  # Random effects
+                  sd.subj_tau = c(0.26, 0.004, 0.11, 0.141, 0.0001), # [2] rescaled for tpoints = 100
+                  sd.wave_loc = 0, # day-to-day sd in means
+                  sd.wave_scale = 0, # day-to-daysd in sigma (trialvar)
+                  cor.subj_tau = matrix(c(1.000, 0.662, 0.445, 0.609, 0.000,
+                                          0.662, 1.000, 0.396, 0.563, 0.000,
+                                          0.445, 0.396, 1.000, 0.305, 0.000,
+                                          0.609, 0.563, 0.305, 1.000, 0.000,
+                                          0.000, 0.000, 0.000, 0.000, 1.000),
+                                        nrow = 5,
+                                        byrow = TRUE)) # correlation matrix for scale trial-level estimates
+
+
 df.LSME  = output$df.LSME
 subj_tau = output$subj_tau                                         
- 
+
 # Stop if a subject drew |phi_i| >= 1 (stationary start becomes NaN) 
 if (any(!is.finite(df.LSME$y)))
   stop(sum(!is.finite(df.LSME$y)), " non-finite values in y: a subject drew |phi_i| >= 1. ",
        "Use another seed or lower sd.subj_tau[3].", call. = FALSE)
- 
+
 ###########################################
 # Add measurement error
 ###########################################
- 
+
 sd_meas <- 0.5
 df.LSME$y_true <- df.LSME$y
 df.LSME$y <- df.LSME$y + rnorm(n = nrow(df.LSME), mean = 0, sd = sd_meas)
- 
+
 ###########################################
 # True values
 ###########################################
- 
+
 gtruth = output$gtruth
 name_vars <- c(
   "alpha", "beta", "phi",
@@ -169,16 +169,16 @@ name_vars <- c(
 )
 # rescale trend and trend SD to the ctime scale (ctime = time / tpoints)
 gtruth[c(2, 22)] <- gtruth[c(2, 22)] * length(unique(df.LSME$time))
- 
+
 gtruth    <- c(gtruth, log(sd_meas))
 name_vars <- c(name_vars, "log_sd_meas")
- 
+
 gtruth = tibble(.variable = name_vars, Value = gtruth)
- 
+
 ###########################################
 # Preprocessing
 ###########################################
- 
+
 # Lagged outcome (only needed for the standard DSEM comparison)
 df.LSME = df.LSME %>%
   group_by(subject, wave) %>%
@@ -187,17 +187,24 @@ df.LSME = df.LSME %>%
   group_by(subject) %>%
   mutate(Y_tm1 = if_else(is.na(Y_tm1), mean(Y_tm1, na.rm = TRUE), Y_tm1)) %>%
   ungroup()
- 
+
 # Rescaled time and each subject's mean time
 df.LSME = df.LSME %>%
   group_by(subject) %>%
   mutate(ctime = time / length(unique(df.LSME$time))) %>%
   mutate(mtime = mean(ctime)) %>%
   ungroup()
- 
+
 # First trial per subject
 df.LSME = df.LSME %>%
   group_by(subject) %>%
   mutate(first = as.integer(row_number() == 1)) %>%
   ungroup()
-  
+
+###########################################
+# Save
+###########################################
+
+write.csv(df.LSME, file.path("sim_data.csv"), row.names = FALSE)
+saveRDS(gtruth,   file.path("gtruth.rds"))                 
+saveRDS(subj_tau, file.path("subj_tau.rds")) 
