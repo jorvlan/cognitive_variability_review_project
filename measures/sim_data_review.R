@@ -19,13 +19,14 @@ library(tidybayes)
 ###################################################################################
 
 # DSEM characteristics
-npeople = 100 # number of subject
-tpoints = 100 # number of trials #was 50
+npeople = 100 # number of subjects
+tpoints = 100 # number of trials
 ndays = 1 # number of days
 
 # TREND VALUES DEPEND ON tpoints. ctime = time/tpoints, so a coefficient on
-# centred ctime equals beta2 * tpoints. Under RDSEM there is no 1/(1-phi)
-# inflation any more, so these are the marginal trend directly:
+# centred ctime equals beta2 * tpoints. Because the autoregression acts on the
+# deviation from the trend line, there is no 1/(1-phi) inflation, so these are
+# the marginal trend directly:
 #
 #   tpoints  50 :  beta2 = 0.01000   sd.subj_tau[2] = 0.00800
 #   tpoints 100 :  beta2 = 0.00500   sd.subj_tau[2] = 0.00400   <- used below
@@ -34,7 +35,7 @@ ndays = 1 # number of days
 # All three give a trend of about 0.6 process SDs across the block.
 
 ####################################################################################
-#1. Data generating model (RDSEM: AR on the residuals)
+#1. Data generating model (AR on the deviation from the trend line)
 ####################################################################################
 
 DataGen <- function(nsubj, nwave, nobs,
@@ -46,15 +47,15 @@ DataGen <- function(nsubj, nwave, nobs,
                                             0.662, 1.000, 0.396, 0.563, 0.000,
                                             0.445, 0.396, 1.000, 0.305, 0.000,
                                             0.609, 0.563, 0.305, 1.000, 0.000,
-                                            0.000, 0.000, 0.000, 0.000, 0.000),
+                                            0.000, 0.000, 0.000, 0.000, 1.000),
                                           nrow = 5,
                                           byrow = TRUE)){
   
   ## Generate subject wave and time indicators
   N <- nsubj * nwave * nobs
   subject <- gl(n = nsubj, k = nwave * nobs)
-  wave <- rep(gl(n = nwave,k = nobs), nsubj)
-  time <- rep(seq_len(nwave*nobs), nsubj)
+  wave <- rep(gl(n = nwave, k = nobs), nsubj)
+  time <- rep(seq_len(nwave * nobs), nsubj)
   mtime <- mean(time)
   
   ## Generate subject, wave level random effects
@@ -77,7 +78,7 @@ DataGen <- function(nsubj, nwave, nobs,
   wave.scale <- rep(rep(wave_scale, each = nobs), nsubj)
   
   # Specify model (restart AR for each subject)
-  # RDSEM: the carry-over acts on the deviation from the subject's OWN trend
+  # The carry-over acts on the deviation from the subject's OWN trend
   # line, so the lag is measured from mu at the PREVIOUS occasion.
   first <- c(TRUE, subject[-1] != subject[-N])
   y <- numeric(N)
@@ -99,22 +100,20 @@ DataGen <- function(nsubj, nwave, nobs,
     }
   }
   
-  
   # Create data frame
   df.LSME <- data.frame(subject = subject, wave = wave, time = time,
                         y = y)
   
   # Save true values in a vector
-  
   gtruth <- c(beta1, beta2, beta3, 
-              cor.subj_tau[1:4,1:4],  alpha0,
+              cor.subj_tau[1:4, 1:4], alpha0,
               sd.subj_tau[1:4])
   
   return(list(df.LSME = df.LSME, gtruth = gtruth, subj_tau = subj_tau))
 }
 
 #########################################################################
-# Simulate data for n repetitions
+# Simulate data
 #########################################################################
 
 set.seed(2094)
@@ -122,23 +121,15 @@ set.seed(2094)
 # Run function
 output <- DataGen(nsubj = npeople, nwave = ndays, nobs = tpoints, # subjects, waves, trials
                   # Fixed effects
-                  beta1 = 0.5, # group mean
-                  beta2 = 0.005,# group trend   (rescaled for tpoints = 100)
-                  beta3 = 0.5, # group ar-1
-                  alpha0 = -0.2, # group sigma (residual SD (innovations))
-                  alpha1 = 0, # group trend on residuals
-                  # Random effects
+                  beta1 = 0.5,   # group mean
+                  beta2 = 0.005, # group trend (rescaled for tpoints = 100)
+                  beta3 = 0.5,   # group AR(1)
+                  alpha0 = -0.2, # group log residual SD (innovations)
+                  alpha1 = 0,    # group trend on residual SD
+                  # Random effects: mean, trend, AR(1), log residual SD, trend in residual SD
                   sd.subj_tau = c(0.26, 0.004, 0.11, 0.141, 0.0001), # [2] rescaled for tpoints = 100
-                  sd.wave_loc = 0, # day-to-day sd in means
-                  sd.wave_scale = 0, # day-to-daysd in sigma (trialvar)
-                  cor.subj_tau = matrix(c(1.000, 0.662, 0.445, 0.609, 0.000,
-                                          0.662, 1.000, 0.396, 0.563, 0.000,
-                                          0.445, 0.396, 1.000, 0.305, 0.000,
-                                          0.609, 0.563, 0.305, 1.000, 0.000,
-                                          0.000, 0.000, 0.000, 0.000, 1.000),
-                                        nrow = 5,
-                                        byrow = TRUE)) # correlation matrix for scale trial-level estimates
-
+                  sd.wave_loc = 0,   # day-to-day SD in means
+                  sd.wave_scale = 0) # day-to-day SD in residual SD
 
 df.LSME  = output$df.LSME
 subj_tau = output$subj_tau                                         
@@ -147,14 +138,6 @@ subj_tau = output$subj_tau
 if (any(!is.finite(df.LSME$y)))
   stop(sum(!is.finite(df.LSME$y)), " non-finite values in y: a subject drew |phi_i| >= 1. ",
        "Use another seed or lower sd.subj_tau[3].", call. = FALSE)
-
-###########################################
-# Add measurement error
-###########################################
-
-sd_meas <- 0.5
-df.LSME$y_true <- df.LSME$y
-df.LSME$y <- df.LSME$y + rnorm(n = nrow(df.LSME), mean = 0, sd = sd_meas)
 
 ###########################################
 # True values
@@ -170,16 +153,13 @@ name_vars <- c(
 # rescale trend and trend SD to the ctime scale (ctime = time / tpoints)
 gtruth[c(2, 22)] <- gtruth[c(2, 22)] * length(unique(df.LSME$time))
 
-gtruth    <- c(gtruth, log(sd_meas))
-name_vars <- c(name_vars, "log_sd_meas")
-
 gtruth = tibble(.variable = name_vars, Value = gtruth)
 
 ###########################################
 # Preprocessing
 ###########################################
 
-# Lagged outcome (only needed for the standard DSEM comparison)
+# Lagged outcome (drives the autoregression in the DSEM)
 df.LSME = df.LSME %>%
   group_by(subject, wave) %>%
   mutate(Y_tm1 = lag(y)) %>%
@@ -193,12 +173,6 @@ df.LSME = df.LSME %>%
   group_by(subject) %>%
   mutate(ctime = time / length(unique(df.LSME$time))) %>%
   mutate(mtime = mean(ctime)) %>%
-  ungroup()
-
-# First trial per subject
-df.LSME = df.LSME %>%
-  group_by(subject) %>%
-  mutate(first = as.integer(row_number() == 1)) %>%
   ungroup()
 
 ###########################################
