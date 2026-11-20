@@ -9,8 +9,6 @@ library(dplyr)
 library(scales)
 library(ggrepel)
 
-# remove later
-review_output_dir = "/Users/maaikeschumer/Desktop/Jordy_PHD/review"
 
 # Figure 1 - top panel - equal means, differing variability
 
